@@ -1,6 +1,6 @@
 name: build npm project
 on:
-  push:
+  pull_request:
     branches:
       - develop
 jobs:
