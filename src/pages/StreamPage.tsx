@@ -113,6 +113,7 @@ export const StreamPage = memo((): JSX.Element => {
                     <WatchingStreamContextProvider watchingStreams={streamIDs}>
                         <Timeline
                             streams={streamIDs}
+                            scrollKey={`stream-${targetStreamID}`}
                             ref={timelineRef}
                             header={
                                 (writeable && (

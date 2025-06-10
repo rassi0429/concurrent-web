@@ -292,6 +292,7 @@ export function ListPage(): JSX.Element {
                                     </>
                                 }
                                 streams={timelines}
+                                scrollKey={`timeline-${id}`}
                                 ref={timelineRef}
                             />
                         ) : (

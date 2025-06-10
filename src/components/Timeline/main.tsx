@@ -14,6 +14,7 @@ import { usePreference } from '../../context/PreferenceContext'
 import { VList, type VListHandle } from 'virtua'
 import { useClient } from '../../context/ClientContext'
 import { UseSoundFormats } from '../../constants'
+import { useScrollPosition, type ScrollPositionData } from '../../context/ScrollPosition'
 
 export interface TimelineProps {
     streams: string[]
@@ -21,6 +22,7 @@ export interface TimelineProps {
     header?: JSX.Element
     onScroll?: (top: number) => void
     noRealtime?: boolean
+    scrollKey?: string
 }
 
 const PTR_HEIGHT = 60
@@ -42,6 +44,7 @@ const timeline = forwardRef((props: TimelineProps, ref: ForwardedRef<VListHandle
     const { client } = useClient()
     const theme = useTheme()
     const [sound] = usePreference('sound')
+    const { saveScrollPosition, getScrollPosition } = useScrollPosition()
 
     const [timeline, timelineChanged] = useRefWithForceUpdate<TimelineReader | null>(null)
 
@@ -61,6 +64,9 @@ const timeline = forwardRef((props: TimelineProps, ref: ForwardedRef<VListHandle
     const playBubbleRef = useRef(playBubble)
 
     const [timelineLoading, setTimelineLoading] = useState<boolean>(true)
+    const [isInitialLoad, setIsInitialLoad] = useState<boolean>(true)
+    const [visibleRange, setVisibleRange] = useState<{ start: number; end: number }>({ start: 0, end: 0 })
+    const [isRestoring, setIsRestoring] = useState<boolean>(false)
 
     useEffect(() => {
         playBubbleRef.current = playBubble
@@ -70,6 +76,9 @@ const timeline = forwardRef((props: TimelineProps, ref: ForwardedRef<VListHandle
         let isCancelled = false
         if (props.streams.length === 0) return
         setTimelineLoading(true)
+        setIsInitialLoad(true)
+        setIsRestoring(false)
+        setVisibleRange({ start: 0, end: 0 })
         const mt = client
             .newTimelineReader({
                 withoutSocket: props.noRealtime ?? false
@@ -92,6 +101,7 @@ const timeline = forwardRef((props: TimelineProps, ref: ForwardedRef<VListHandle
                     })
                     .finally(() => {
                         setTimelineLoading(false)
+                        setIsInitialLoad(false)
                     })
                 return t
             })
@@ -102,6 +112,59 @@ const timeline = forwardRef((props: TimelineProps, ref: ForwardedRef<VListHandle
             })
         }
     }, [props.streams])
+
+    // Restore scroll position when timeline is loaded and enough data is available
+    useEffect(() => {
+        if (!timelineLoading && !isInitialLoad && props.scrollKey && ref && typeof ref === 'object' && ref.current && !isRestoring) {
+            const savedData = getScrollPosition(props.scrollKey)
+            if (savedData && savedData.visibleStartIndex > 0) {
+                setIsRestoring(true)
+                const currentCount = timeline.current?.body.length ?? 0
+                
+                // If we don't have enough data, try to load more
+                if (currentCount <= savedData.visibleStartIndex + 10) {
+                    const loadMoreUntilEnough = async () => {
+                        let attempts = 0
+                        const maxAttempts = 5
+                        
+                        while (attempts < maxAttempts && (timeline.current?.body.length ?? 0) <= savedData.visibleStartIndex + 10) {
+                            if (hasMoreData && !isFetching) {
+                                await new Promise<void>((resolve) => {
+                                    setIsFetching(true)
+                                    timeline.current?.readMore().then((hasMore) => {
+                                        setHasMoreData(hasMore)
+                                        setIsFetching(false)
+                                        resolve()
+                                    })
+                                })
+                            } else {
+                                break
+                            }
+                            attempts++
+                        }
+                        
+                        // Restore scroll position after loading
+                        setTimeout(() => {
+                            if (ref && typeof ref === 'object' && ref.current) {
+                                ref.current.scrollToIndex(savedData.visibleStartIndex, { align: 'start' })
+                            }
+                            setIsRestoring(false)
+                        }, 100)
+                    }
+                    
+                    loadMoreUntilEnough()
+                } else {
+                    // We have enough data, restore immediately
+                    setTimeout(() => {
+                        if (ref && typeof ref === 'object' && ref.current) {
+                            ref.current.scrollToIndex(savedData.visibleStartIndex, { align: 'start' })
+                        }
+                        setIsRestoring(false)
+                    }, 100)
+                }
+            }
+        }
+    }, [timelineLoading, isInitialLoad, props.scrollKey, ref, hasMoreData, isFetching])
 
     const positionRef = useRef<number>(0)
     const scrollParentRef = useRef<HTMLDivElement>(null)
@@ -241,8 +304,18 @@ const timeline = forwardRef((props: TimelineProps, ref: ForwardedRef<VListHandle
                     onScroll={(top) => {
                         positionRef.current = top
                         props.onScroll?.(top)
+                        // Save detailed scroll position if scrollKey is provided
+                        if (props.scrollKey && !isRestoring) {
+                            saveScrollPosition(props.scrollKey, {
+                                scrollOffset: top,
+                                visibleStartIndex: visibleRange.start,
+                                visibleEndIndex: visibleRange.end,
+                                totalCount: count
+                            })
+                        }
                     }}
-                    onRangeChange={(_, end) => {
+                    onRangeChange={(start, end) => {
+                        setVisibleRange({ start, end })
                         if (end + 3 > count && hasMoreData) readMore()
                     }}
                     ref={ref}

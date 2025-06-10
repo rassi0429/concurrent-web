@@ -43,6 +43,7 @@ import { ConfirmProvider } from './context/Confirm'
 import { type ConcurrentTheme } from './model'
 import { TimelineDrawerProvider } from './context/TimelineDrawer'
 import { UserDrawerProvider } from './context/UserDrawer'
+import { ScrollPositionProvider } from './context/ScrollPosition'
 
 const SwitchMasterToSub = lazy(() => import('./components/SwitchMasterToSub'))
 
@@ -292,25 +293,27 @@ function App(): JSX.Element {
             classes={isMobileSize ? { containerRoot: 'snackbar-container-mobile' } : undefined}
         >
             <TickerProvider>
-                <UrlSummaryProvider host={client.host}>
-                    <MediaViewerProvider>
-                        <EmojiPickerProvider>
-                            <StorageProvider>
-                                <ConcordProvider>
-                                    <EditorModalProvider>
-                                        <TimelineDrawerProvider>
-                                            <UserDrawerProvider>
-                                                <ConfirmProvider>
-                                                    <GlobalActionsProvider>{childs}</GlobalActionsProvider>
-                                                </ConfirmProvider>
-                                            </UserDrawerProvider>
-                                        </TimelineDrawerProvider>
-                                    </EditorModalProvider>
-                                </ConcordProvider>
-                            </StorageProvider>
-                        </EmojiPickerProvider>
-                    </MediaViewerProvider>
-                </UrlSummaryProvider>
+                <ScrollPositionProvider>
+                    <UrlSummaryProvider host={client.host}>
+                        <MediaViewerProvider>
+                            <EmojiPickerProvider>
+                                <StorageProvider>
+                                    <ConcordProvider>
+                                        <EditorModalProvider>
+                                            <TimelineDrawerProvider>
+                                                <UserDrawerProvider>
+                                                    <ConfirmProvider>
+                                                        <GlobalActionsProvider>{childs}</GlobalActionsProvider>
+                                                    </ConfirmProvider>
+                                                </UserDrawerProvider>
+                                            </TimelineDrawerProvider>
+                                        </EditorModalProvider>
+                                    </ConcordProvider>
+                                </StorageProvider>
+                            </EmojiPickerProvider>
+                        </MediaViewerProvider>
+                    </UrlSummaryProvider>
+                </ScrollPositionProvider>
             </TickerProvider>
         </SnackbarProvider>
     )
